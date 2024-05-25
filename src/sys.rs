@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types)]
 
-use libc::{c_char, c_int, c_uint};
 use bitflags::bitflags;
+use libc::{c_char, c_int, c_uint};
 
 pub const OSSIOCPARM_MASK: c_int = 0x1fff;
 
@@ -20,7 +20,7 @@ macro_rules! OSSIOC_SZ {
 
 macro_rules! __OSSIO {
     ($x:literal, $y:literal) => {
-        (OSSIOC_VOID | (x << 8) | y)
+        (OSSIOC_VOID | (($x as c_int) << 8) | $y)
     };
 }
 
@@ -40,6 +40,21 @@ pub const SNDCTL_SYSINFO: c_int = __OSSIOR!('X', 1, oss_sysinfo);
 pub const SNDCTL_AUDIOINFO: c_int = __OSSIOWR!('X', 7, oss_audioinfo);
 pub const SNDCTL_MIXERINFO: c_int = __OSSIOWR!('X', 10, oss_mixerinfo);
 pub const SNDCTL_CARDINFO: c_int = __OSSIOWR!('X', 11, oss_card_info);
+
+pub const SNDCTL_DSP_HALT: c_int = __OSSIO!('P', 0);
+pub const SNDCTL_DSP_SYNC: c_int = __OSSIO!('P', 1);
+pub const SNDCTL_DSP_SPEED: c_int = __OSSIOWR!('P', 2, c_int);
+pub const SNDCTL_DSP_SETFMT: c_int = __OSSIOWR!('P', 5, c_int);
+pub const SNDCTL_DSP_CHANNELS: c_int = __OSSIOWR!('P', 6, c_int);
+pub const SNDCTL_DSP_GETFMTS: c_int = __OSSIOR!('P', 11, c_int);
+pub const SNDCTL_DSP_GETOSPACE: c_int = __OSSIOR!('P', 12, audio_buf_info);
+pub const SNDCTL_DSP_GETISPACE: c_int = __OSSIOR!('P', 13, audio_buf_info);
+pub const SNDCTL_DSP_GETPLAYVOL: c_int = __OSSIOR!('P', 24, c_int);
+pub const SNDCTL_DSP_SETPLAYVOL: c_int = __OSSIOWR!('P', 24, c_int);
+pub const SNDCTL_DSP_GETERROR: c_int = __OSSIOR!('P', 25, audio_errinfo);
+pub const SNDCTL_DSP_HALT_INPUT: c_int = __OSSIO!('P', 33);
+pub const SNDCTL_DSP_HALT_OUTPUT: c_int = __OSSIO!('P', 34);
+
 pub const OSS_GETVERSION: c_int = __OSSIOR!('M', 118, c_int);
 
 #[repr(C)]
@@ -185,6 +200,67 @@ impl Default for oss_mixerinfo {
     }
 }
 
+#[derive(Debug)]
+#[repr(C)]
+pub struct audio_errinfo {
+    pub play_underruns: c_int,
+    pub rec_overruns: c_int,
+    pub play_ptradjust: c_uint,
+    pub rec_ptradjust: c_uint,
+    pub play_errorcount: c_int,
+    pub rec_errorcount: c_int,
+    pub play_lasterror: c_int,
+    pub rec_lasterror: c_int,
+    pub play_errorparm: c_int,
+    pub rec_errorparm: c_int,
+    pub filler: [c_int; 16],
+}
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct audio_buf_info {
+    pub fragments: c_int,
+    pub fragstotal: c_int,
+    pub fragsize: c_int,
+    pub bytes: c_int,
+}
+
+bitflags! {
+    #[repr(transparent)]
+    #[derive(Debug)]
+    pub struct AudioFormats: libc::c_int {
+        const AFMT_MU_LAW = 0x00000001;
+        const AFMT_A_LAW = 0x00000002;
+        const AFMT_IMA_ADPCM = 0x00000004;
+        const AFMT_U8 = 0x00000008;
+        const AFMT_S16_LE = 0x00000010;
+        const AFMT_S16_BE = 0x00000020;
+        const AFMT_S8 = 0x00000040;
+        const AFMT_U16_LE = 0x00000080;
+        const AFMT_U16_BE = 0x00000100;
+        const AFMT_MPEG = 0x00000200;
+        const AFMT_AC3 = 0x00000400;
+        const AFMT_VORBIS = 0x00000800;
+        const AFMT_S32_LE = 0x00001000;
+        const AFMT_S32_BE = 0x00002000;
+        const AFMT_FLOAT = 0x00004000;
+        const AFMT_S24_LE = 0x00008000;
+        const AFMT_S24_BE = 0x00010000;
+        const AFMT_SPDIF_RAW = 0x00020000;
+        const AFMT_S24_PACKED = 0x00040000;
+
+        /*
+         * Other bits may have been set by the OS.
+         */
+        const _ = !0;
+
+        const AFMT_U16_NE = Self::AFMT_U16_LE.bits();
+        const AFMT_S16_NE = Self::AFMT_S16_LE.bits();
+        const AFMT_S24_NE = Self::AFMT_S24_LE.bits();
+        const AFMT_S32_NE = Self::AFMT_S32_LE.bits();
+    }
+}
+
 /*
  * Make sure struct sizes match the C definitions.
  */
@@ -192,3 +268,5 @@ const _: () = assert!(std::mem::size_of::<oss_sysinfo>() == 0x4e0);
 const _: () = assert!(std::mem::size_of::<oss_audioinfo>() == 0x49c);
 const _: () = assert!(std::mem::size_of::<oss_card_info>() == 0x498);
 const _: () = assert!(std::mem::size_of::<oss_mixerinfo>() == 0x470);
+const _: () = assert!(std::mem::size_of::<audio_errinfo>() == 0x68);
+const _: () = assert!(std::mem::size_of::<audio_buf_info>() == 0x10);
