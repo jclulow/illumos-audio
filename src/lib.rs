@@ -50,17 +50,7 @@ impl MixerInfo {
     }
 
     pub fn sysinfo(&self) -> std::io::Result<SysInfo> {
-        //let mut buf: sys::oss_sysinfo = unsafe { std::mem::zeroed() };
-        let mut buf: MaybeUninit<sys::oss_sysinfo> = MaybeUninit::uninit();
-
-        let fd = self.f.as_raw_fd();
-        let r =
-            unsafe { libc::ioctl(fd, sys::SNDCTL_SYSINFO, buf.as_mut_ptr()) };
-        if r != 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-
-        let buf = unsafe { buf.assume_init() };
+        let buf: sys::oss_sysinfo = basic_ioctl(&self.f, sys::SNDCTL_SYSINFO)?;
 
         let product = c_chars_to_string(&buf.product).unwrap();
         let version = c_chars_to_string(&buf.version).unwrap();
@@ -78,6 +68,56 @@ impl MixerInfo {
             licence,
         })
     }
+
+    pub fn audioinfo(&self, index: u32) -> std::io::Result<AudioInfo> {
+        let buf: sys::oss_audioinfo = basic_ioctl_inout(
+            &self.f,
+            sys::SNDCTL_AUDIOINFO,
+            sys::oss_audioinfo {
+                dev: index.try_into().unwrap(),
+                ..Default::default()
+            },
+        )?;
+
+        let caps = sys::Caps::from_bits(buf.caps).unwrap();
+        let caps_revision = (buf.caps & sys::PCM_CAP_REVISION) as u32;
+
+        Ok(AudioInfo {
+            dev: buf.dev.try_into().unwrap(),
+            name: c_chars_to_string(&buf.name).unwrap(),
+            card_number: buf.card_number.try_into().unwrap(),
+            mixer_dev: buf.mixer_dev.try_into().unwrap(),
+            caps,
+            caps_revision,
+            min_rate: buf.min_rate.try_into().unwrap(),
+            max_rate: buf.max_rate.try_into().unwrap(),
+            min_channels: buf.min_channels.try_into().unwrap(),
+            max_channels: buf.max_channels.try_into().unwrap(),
+            devnode: c_chars_to_string(&buf.devnode).unwrap(),
+        })
+    }
+}
+
+fn basic_ioctl_inout<T>(f: &File, cmd: i32, mut buf: T) -> std::io::Result<T> {
+    let fd = f.as_raw_fd();
+    let r = unsafe { libc::ioctl(fd, cmd, &mut buf) };
+    if r != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    Ok(buf)
+}
+
+fn basic_ioctl<T>(f: &File, cmd: i32) -> std::io::Result<T> {
+    let mut buf: MaybeUninit<T> = MaybeUninit::uninit();
+
+    let fd = f.as_raw_fd();
+    let r = unsafe { libc::ioctl(fd, cmd, buf.as_mut_ptr()) };
+    if r != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+
+    Ok(unsafe { buf.assume_init() })
 }
 
 fn c_chars_to_string(input: &[libc::c_char]) -> Option<String> {
@@ -98,4 +138,19 @@ pub struct SysInfo {
     pub num_cards: u32,
     pub num_audio_engines: u32,
     pub licence: String,
+}
+
+#[derive(Debug)]
+pub struct AudioInfo {
+    pub dev: u32,
+    pub name: String,
+    pub card_number: u32,
+    pub mixer_dev: u32,
+    pub caps_revision: u32,
+    pub caps: sys::Caps,
+    pub min_rate: u32,
+    pub max_rate: u32,
+    pub min_channels: u32,
+    pub max_channels: u32,
+    pub devnode: String,
 }
