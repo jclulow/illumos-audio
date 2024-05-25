@@ -38,6 +38,7 @@ macro_rules! __OSSIOWR {
 
 pub const SNDCTL_SYSINFO: c_int = __OSSIOR!('X', 1, oss_sysinfo);
 pub const SNDCTL_AUDIOINFO: c_int = __OSSIOWR!('X', 7, oss_audioinfo);
+pub const SNDCTL_MIXERINFO: c_int = __OSSIOWR!('X', 10, oss_mixerinfo);
 pub const SNDCTL_CARDINFO: c_int = __OSSIOWR!('X', 11, oss_card_info);
 pub const OSS_GETVERSION: c_int = __OSSIOR!('M', 118, c_int);
 
@@ -69,7 +70,7 @@ pub const OSS_MAX_SAMPLE_RATES: usize = 20;
 bitflags! {
     #[repr(transparent)]
     #[derive(Debug)]
-    pub struct Caps: libc::c_int {
+    pub struct AudioCaps: libc::c_int {
         const PCM_CAP_DUPLEX = 0x00000100; /* Full duplex rec/play */
         const PCM_CAP_REALTIME = 0x00000200; /* Not supported?! */
         const PCM_CAP_BATCH = 0x00000400; /* Not supported?! */
@@ -158,9 +159,36 @@ impl Default for oss_card_info {
     }
 }
 
+#[repr(C)]
+pub struct oss_mixerinfo {
+    pub dev: c_int,
+    pub id: [c_char; 16],
+    pub name: [c_char; 32],
+    pub modify_counter: c_int,
+    pub card_number: c_int,
+    pub port_number: c_int,
+    pub handle: [c_char; 32],
+    pub magic: c_int,
+    pub enabled: c_int,
+    pub caps: c_int,
+    pub flags: c_int,
+    pub nrext: c_int,
+    pub priority: c_int,
+    pub devnode: [c_char; OSS_DEVNODE_SIZE],
+    pub legacy_device: c_int,
+    pub filler: [c_int; 245],
+}
+
+impl Default for oss_mixerinfo {
+    fn default() -> Self {
+        unsafe { std::mem::zeroed() }
+    }
+}
+
 /*
  * Make sure struct sizes match the C definitions.
  */
 const _: () = assert!(std::mem::size_of::<oss_sysinfo>() == 0x4e0);
 const _: () = assert!(std::mem::size_of::<oss_audioinfo>() == 0x49c);
 const _: () = assert!(std::mem::size_of::<oss_card_info>() == 0x498);
+const _: () = assert!(std::mem::size_of::<oss_mixerinfo>() == 0x470);

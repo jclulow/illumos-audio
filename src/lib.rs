@@ -7,18 +7,18 @@ pub mod sys;
  * system.  This object requests that information but does not allow mixer
  * control.
  */
-pub struct MixerInfo {
+pub struct Mixer {
     f: File,
     maj: u32,
     min: u32,
 }
 
-impl MixerInfo {
-    pub fn open() -> std::io::Result<MixerInfo> {
+impl Mixer {
+    pub fn open() -> std::io::Result<Self> {
         Self::open_path("/dev/mixer")
     }
 
-    pub fn open_path<P: AsRef<Path>>(mixer: P) -> std::io::Result<MixerInfo> {
+    pub fn open_path<P: AsRef<Path>>(mixer: P) -> std::io::Result<Self> {
         let p = mixer.as_ref();
         let f = std::fs::OpenOptions::new().read(true).write(true).open(p)?;
 
@@ -42,7 +42,7 @@ impl MixerInfo {
             return Err(std::io::Error::from_raw_os_error(libc::EINVAL));
         }
 
-        Ok(MixerInfo { f, maj, min })
+        Ok(Self { f, maj, min })
     }
 
     pub fn version(&self) -> (u32, u32) {
@@ -79,7 +79,7 @@ impl MixerInfo {
             },
         )?;
 
-        let caps = sys::Caps::from_bits(buf.caps).unwrap();
+        let caps = sys::AudioCaps::from_bits(buf.caps).unwrap();
         let caps_revision = (buf.caps & sys::PCM_CAP_REVISION) as u32;
 
         Ok(AudioInfo {
@@ -111,6 +111,27 @@ impl MixerInfo {
             shortname: c_chars_to_string(&buf.shortname).unwrap(),
             longname: c_chars_to_string(&buf.longname).unwrap(),
             hw_info: c_chars_to_string(&buf.hw_info).unwrap(),
+        })
+    }
+
+    pub fn mixerinfo(&self, index: u32) -> std::io::Result<MixerInfo> {
+        let buf: sys::oss_mixerinfo = basic_ioctl_inout(
+            &self.f,
+            sys::SNDCTL_MIXERINFO,
+            sys::oss_mixerinfo {
+                dev: index.try_into().unwrap(),
+                ..Default::default()
+            },
+        )?;
+
+        Ok(MixerInfo {
+            dev: buf.dev.try_into().unwrap(),
+            name: c_chars_to_string(&buf.name).unwrap(),
+            card_number: buf.card_number.try_into().unwrap(),
+            modify_counter: buf.modify_counter.try_into().unwrap(),
+            nrext: buf.nrext.try_into().unwrap(),
+            priority: buf.priority,
+            devnode: c_chars_to_string(&buf.devnode).unwrap(),
         })
     }
 }
@@ -164,7 +185,7 @@ pub struct AudioInfo {
     pub card_number: u32,
     pub mixer_dev: u32,
     pub caps_revision: u32,
-    pub caps: sys::Caps,
+    pub caps: sys::AudioCaps,
     pub min_rate: u32,
     pub max_rate: u32,
     pub min_channels: u32,
@@ -177,4 +198,15 @@ pub struct CardInfo {
     pub shortname: String,
     pub longname: String,
     pub hw_info: String,
+}
+
+#[derive(Debug)]
+pub struct MixerInfo {
+    pub dev: u32,
+    pub name: String,
+    pub modify_counter: u32,
+    pub card_number: u32,
+    pub nrext: u32,
+    pub priority: i32,
+    pub devnode: String,
 }
