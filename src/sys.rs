@@ -38,6 +38,7 @@ macro_rules! __OSSIOWR {
 
 pub const SNDCTL_SYSINFO: c_int = __OSSIOR!('X', 1, oss_sysinfo);
 pub const SNDCTL_AUDIOINFO: c_int = __OSSIOWR!('X', 7, oss_audioinfo);
+pub const SNDCTL_CARDINFO: c_int = __OSSIOWR!('X', 11, oss_card_info);
 pub const OSS_GETVERSION: c_int = __OSSIOR!('M', 118, c_int);
 
 #[repr(C)]
@@ -139,8 +140,27 @@ impl Default for oss_audioinfo {
     }
 }
 
+#[repr(C)]
+pub struct oss_card_info {
+    pub card: c_int,
+    pub shortname: [c_char; 16],
+    pub longname: [c_char; 128],
+    pub flags: c_int,
+    pub hw_info: [c_char; 400],
+    pub intr_count: c_int,
+    pub ack_count: c_int,
+    pub filler: [c_int; 154],
+}
+
+impl Default for oss_card_info {
+    fn default() -> Self {
+        unsafe { std::mem::zeroed() }
+    }
+}
+
 /*
  * Make sure struct sizes match the C definitions.
  */
 const _: () = assert!(std::mem::size_of::<oss_sysinfo>() == 0x4e0);
 const _: () = assert!(std::mem::size_of::<oss_audioinfo>() == 0x49c);
+const _: () = assert!(std::mem::size_of::<oss_card_info>() == 0x498);

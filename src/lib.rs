@@ -96,6 +96,23 @@ impl MixerInfo {
             devnode: c_chars_to_string(&buf.devnode).unwrap(),
         })
     }
+
+    pub fn cardinfo(&self, index: u32) -> std::io::Result<CardInfo> {
+        let buf: sys::oss_card_info = basic_ioctl_inout(
+            &self.f,
+            sys::SNDCTL_CARDINFO,
+            sys::oss_card_info {
+                card: index.try_into().unwrap(),
+                ..Default::default()
+            },
+        )?;
+
+        Ok(CardInfo {
+            shortname: c_chars_to_string(&buf.shortname).unwrap(),
+            longname: c_chars_to_string(&buf.longname).unwrap(),
+            hw_info: c_chars_to_string(&buf.hw_info).unwrap(),
+        })
+    }
 }
 
 fn basic_ioctl_inout<T>(f: &File, cmd: i32, mut buf: T) -> std::io::Result<T> {
@@ -153,4 +170,11 @@ pub struct AudioInfo {
     pub min_channels: u32,
     pub max_channels: u32,
     pub devnode: String,
+}
+
+#[derive(Debug)]
+pub struct CardInfo {
+    pub shortname: String,
+    pub longname: String,
+    pub hw_info: String,
 }
