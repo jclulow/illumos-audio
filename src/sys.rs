@@ -49,6 +49,7 @@ pub const SNDCTL_DSP_CHANNELS: c_int = __OSSIOWR!('P', 6, c_int);
 pub const SNDCTL_DSP_GETFMTS: c_int = __OSSIOR!('P', 11, c_int);
 pub const SNDCTL_DSP_GETOSPACE: c_int = __OSSIOR!('P', 12, audio_buf_info);
 pub const SNDCTL_DSP_GETISPACE: c_int = __OSSIOR!('P', 13, audio_buf_info);
+pub const SNDCTL_DSP_GETODELAY: c_int = __OSSIOR!('P', 23, c_int);
 pub const SNDCTL_DSP_GETPLAYVOL: c_int = __OSSIOR!('P', 24, c_int);
 pub const SNDCTL_DSP_SETPLAYVOL: c_int = __OSSIOWR!('P', 24, c_int);
 pub const SNDCTL_DSP_GETERROR: c_int = __OSSIOR!('P', 25, audio_errinfo);
@@ -84,7 +85,7 @@ pub const OSS_MAX_SAMPLE_RATES: usize = 20;
 
 bitflags! {
     #[repr(transparent)]
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct AudioCaps: libc::c_int {
         const PCM_CAP_DUPLEX = 0x00000100; /* Full duplex rec/play */
         const PCM_CAP_REALTIME = 0x00000200; /* Not supported?! */
@@ -216,7 +217,7 @@ pub struct audio_errinfo {
     pub filler: [c_int; 16],
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[repr(C)]
 pub struct audio_buf_info {
     pub fragments: c_int,
@@ -227,7 +228,7 @@ pub struct audio_buf_info {
 
 bitflags! {
     #[repr(transparent)]
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct AudioFormats: libc::c_int {
         const AFMT_MU_LAW = 0x00000001;
         const AFMT_A_LAW = 0x00000002;

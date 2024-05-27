@@ -136,7 +136,7 @@ impl Mixer {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SysInfo {
     pub product: String,
     pub version: String,
@@ -149,7 +149,7 @@ pub struct SysInfo {
     pub licence: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AudioInfo {
     pub dev: u32,
     pub name: String,
@@ -164,14 +164,14 @@ pub struct AudioInfo {
     pub devnode: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CardInfo {
     pub shortname: String,
     pub longname: String,
     pub hw_info: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MixerInfo {
     pub dev: u32,
     pub name: String,

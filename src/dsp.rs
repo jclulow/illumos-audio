@@ -1,13 +1,14 @@
-use std::{fs::File, io::Write as _, os::fd::AsRawFd, path::Path};
+use std::{fs::File, os::fd::AsRawFd, path::Path};
 
-use crate::{
-    basic_ioctl, basic_ioctl_inout, basic_ioctl_noarg, c_chars_to_string, sys,
-};
+use libc::c_void;
+
+use crate::{basic_ioctl, basic_ioctl_inout, basic_ioctl_noarg, sys};
 
 /**
  * DSP device nodes are how we play or record audio to specific outputs on the
  * system.
  */
+#[derive(Debug)]
 pub struct Dsp {
     f: File,
 }
@@ -59,8 +60,13 @@ impl Dsp {
         basic_ioctl_noarg(&self.f, sys::SNDCTL_DSP_HALT_OUTPUT)
     }
 
-    pub fn errors(&self) -> std::io::Result<sys::audio_errinfo> {
-        basic_ioctl(&self.f, sys::SNDCTL_DSP_GETERROR)
+    pub fn errors(&self) -> std::io::Result<ErrorInfo> {
+        let ei: sys::audio_errinfo =
+            basic_ioctl(&self.f, sys::SNDCTL_DSP_GETERROR)?;
+        Ok(ErrorInfo {
+            play_underruns: ei.play_underruns.try_into().unwrap(),
+            rec_overruns: ei.rec_overruns.try_into().unwrap(),
+        })
     }
 
     pub fn volume_play(&self) -> std::io::Result<u8> {
@@ -140,17 +146,19 @@ impl Dsp {
             return Err(std::io::Error::from_raw_os_error(libc::EINVAL));
         }
 
-        let v: libc::c_int = basic_ioctl_inout(
-            &self.f,
-            sys::SNDCTL_DSP_SETFMT,
-            bits,
-        )?;
+        let v: libc::c_int =
+            basic_ioctl_inout(&self.f, sys::SNDCTL_DSP_SETFMT, bits)?;
 
         if v != bits.try_into().unwrap() {
             return Err(std::io::Error::from_raw_os_error(libc::EINVAL));
         }
 
         Ok(())
+    }
+
+    pub fn delay(&self) -> std::io::Result<usize> {
+        let v: libc::c_int = basic_ioctl(&self.f, sys::SNDCTL_DSP_GETODELAY)?;
+        Ok(v.try_into().unwrap())
     }
 
     pub fn speed(&self) -> std::io::Result<u32> {
@@ -181,8 +189,37 @@ impl Dsp {
         Ok(())
     }
 
-    pub fn play(&mut self, buf: &[u8]) -> std::io::Result<()> {
-        self.f.write_all(buf)?;
+    pub fn play(&self, buf: &[u8]) -> std::io::Result<()> {
+        let fd = self.f.as_raw_fd();
+
+        let len = buf.len();
+        let buf = buf.as_ptr();
+
+        let wsz = unsafe { libc::write(fd, buf as *const c_void, len) };
+        if wsz < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        /*
+         * XXX Check write size?
+         */
         Ok(())
+    }
+
+    //pub fn play(&mut self, buf: &[u8]) -> std::io::Result<()> {
+    //    self.f.write_all(buf)?;
+    //    Ok(())
+    //}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErrorInfo {
+    pub play_underruns: u32,
+    pub rec_overruns: u32,
+}
+
+impl ErrorInfo {
+    pub fn is_ok(&self) -> bool {
+        self.play_underruns == 0 && self.rec_overruns == 0
     }
 }
